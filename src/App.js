@@ -118,7 +118,7 @@ function App() {
        <Drawer setCartItems = {setCartItems} items={cartItems}  onClose={() => setCartOpened(false)}  onRemove={onRemoveItem} opened={cartOpened}/>
       <Header onClickCart={() => setCartOpened(true)}/>
       <Routes>
-        <Route path='/' element={<Home
+        <Route path='' element={<Home
             items={items}
             cartItems={cartItems}
             searchValue={searchValue}
@@ -132,10 +132,10 @@ function App() {
         </Route>
       </Routes>
       <Routes>
-        <Route exact path='/favorites' element={<Favorites
+        <Route exact path='favorites' element={<Favorites
           />} >
         </Route>
-        <Route exact path='/orders' element={<Orders
+        <Route exact path='orders' element={<Orders
           />} >
         </Route>
       </Routes>
