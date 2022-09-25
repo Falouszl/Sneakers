@@ -1,73 +1,147 @@
 import React from "react";
-import Card from "./components/Card";
+import Home from "./pages/Home";
+import Favorites from "./pages/Favorites";
+import { Routes } from 'react-router-dom';
+import { Route } from "react-router-dom";
 import Header from "./components/Header";
 import Drawer from "./components/Drawer";
-
+import axios from "axios";
+import { useEffect } from "react";
+import AppContext from "./context";
+import Orders from "./pages/Orders";
 
 function App() {
-  let number;
   const [items , setItems] = React.useState([]);
   const [cartItems , setCartItems] = React.useState([]);
-  const [cartItemsPrice = 0 , setCartItemsPrice] = React.useState([]);
+  const [searchValue , setSearchValue] = React.useState('');
   const [cartOpened , setCartOpened] = React.useState(false);
-  const [cartFee , setCartFee] = React.useState([]);
+  const [favorites, setFavorites] =React.useState([])
+  const [isLoading, setIsLoading] =React.useState(true)
 
-  React.useEffect(() => {
-    fetch('https://62892b9910e93797c1633d2e.mockapi.io/items')
-    .then((res) => {
-      return res.json();
-    })
-    .then((json) => {
-      setItems(json) 
-    });
+  useEffect( () => {
+    async function fetchData() {
+      try {
+        const [cartResponse , favoritesResponse , itemsResponse] = await Promise.all([
+          axios.get('https://62892b9910e93797c1633d2e.mockapi.io/cart') ,
+          axios.get('https://62892b9910e93797c1633d2e.mockapi.io/favorites'),
+          axios.get('https://62892b9910e93797c1633d2e.mockapi.io/items')
+        ])
+
+        setIsLoading(false);
+        setCartItems(cartResponse.data)
+        setFavorites(favoritesResponse.data)
+        setItems(itemsResponse.data)
+      } catch (error) {
+        alert('Ошибка при запросе данных ;(')
+        console.error(error)
+      }
+    }
+
+    fetchData()
   } , []);
-  let sum = 0;
-  const countFee = (sum) => {
-    setCartFee(() => sum = sum * 0.05)
+
+  const onAddToCart = async (obj) => {
+      try {
+        const findItem = cartItems.find((item) => Number(item.parentId) === Number(obj.id))
+        if (findItem) {
+          setCartItems((prev) => prev.filter((item) => Number(item.parentId) !== Number(obj.id)))
+          await axios.delete(`https://62892b9910e93797c1633d2e.mockapi.io/cart/${findItem.id}` );
+        }
+        else {
+          setCartItems((prev) => [...prev , obj]);
+          const {data} = await axios.post('https://62892b9910e93797c1633d2e.mockapi.io/cart' , obj);
+          setCartItems((prev) => prev.map(item => {
+            if (item.parentId === data.parentId) {
+              return {
+                ...item,
+                id: data.id
+              }
+            }
+            return item
+          }));
+        }
+      } catch (error) {
+        alert('Ошибка при добавлении в корзину')
+        console.error(error)
+      }
   }
-  const onAddToCart = (obj) => {
-    setCartItems(() => [...cartItems , obj])
+
+  const onRemoveItem = (id) => {
+    try {
+      axios.delete(`https://62892b9910e93797c1633d2e.mockapi.io/cart/${id}`);
+      setCartItems((prev) => prev.filter((item) => Number(item.id) !== Number(id)));
+    } catch (error) {
+      alert('Ошибка при удалении из корзины');
+      console.error(error)
+    }
   }
-  const onDeleteCart = (obj) => {
-    setCartItems(cartItems.filter( elm => elm  == obj ))
+
+  const onAddToFavorite = async (obj) => {
+    console.log(obj.id)
+    try {
+      if (favorites.find((favObj) => Number(favObj.id) === Number(obj.id))) {
+        axios.delete(`https://62892b9910e93797c1633d2e.mockapi.io/favorites/${obj.id}`);
+        setFavorites((prev) => prev.filter((item) => Number(item.id) !== Number(obj.id)))
+      }    
+      else {
+        const { data } = await axios.post('https://62892b9910e93797c1633d2e.mockapi.io/favorites', obj)
+        setFavorites((prev) => [...prev , data]);
+      }
+    } catch (error) {
+      alert('Не удалось добавить')
+      console.error(error)
+    }
+    
+
   }
-  const priceTotal = (obj) => {
-    console.log(cartItemsPrice)
-    setCartItemsPrice(() => cartItemsPrice =  cartItemsPrice + obj.price );
-    // countFee(sum);
+
+  const onChangeSearchInput = (event) => {
+    setSearchValue(event.target.value)
   }
-  console.log(cartItems)
+
+  const isItemAdded = (id) => {
+    return cartItems.some((obj) => Number(obj.parentId) === Number(id))
+  }
 
   return (
-    <div className="wrapper clear">
-      {cartOpened && <Drawer onDelete = {(obj) =>  onDeleteCart(obj)} sum = {cartItemsPrice} items={cartItems}  onClose={() => setCartOpened(false)}/> }
+    <AppContext.Provider value={{
+        items ,
+        cartItems ,
+        favorites , 
+        isItemAdded , 
+        onAddToFavorite ,
+        onAddToCart, 
+        setCartOpened ,
+        setCartItems 
+      }}>
+      <div className="wrapper clear">
+       <Drawer setCartItems = {setCartItems} items={cartItems}  onClose={() => setCartOpened(false)}  onRemove={onRemoveItem} opened={cartOpened}/>
       <Header onClickCart={() => setCartOpened(true)}/>
-
-      <div className="content p-40">
-        <div className="d-flex align-center justify-between mb-40">
-          <h1>Все кроссовки</h1>
-          <div className="search-block d-flex">
-            <img src="/img/search.svg" alt="Search"/>
-            <input placeholder="Поиск ..."/>
-          </div>
-        </div>
-
-
-        <div className="d-flex flex-wrap">
-            {items.map((item) => (
-              <Card
-                title={item.title}
-                price={item.price} 
-                imageUrl={item.imageUrl}
-                onFavourite = {() => console.log('Добавили закладки')}
-                onPlus = {(obj) => onAddToCart(obj)}  />
-            ))}
-        </div>
-        
-
+      <Routes>
+        <Route path='/' element={<Home
+            items={items}
+            cartItems={cartItems}
+            searchValue={searchValue}
+            setSearchValue={setSearchValue}
+            onChangeSearchInput={onChangeSearchInput}
+            onAddToFavorite={onAddToFavorite}
+            onAddToCart={onAddToCart}
+            isLoading={isLoading}
+            // onRemoveItem={onRemoveItem}
+          />} >
+        </Route>
+      </Routes>
+      <Routes>
+        <Route exact path='/favorites' element={<Favorites
+          />} >
+        </Route>
+        <Route exact path='/orders' element={<Orders
+          />} >
+        </Route>
+      </Routes>
 
       </div>
-    </div>
+    </AppContext.Provider>
   );
 }
 
